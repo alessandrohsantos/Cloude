@@ -78,12 +78,14 @@ class SantanderParser:
 
         return []
 
+    PDF_PASSWORD = "13970639808"
+
     def _parse_pdf(
         self, message_id: str, pdf_bytes: bytes, received_date: date
     ) -> list[Transaction]:
         transactions = []
         try:
-            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            with pdfplumber.open(io.BytesIO(pdf_bytes), password=self.PDF_PASSWORD) as pdf:
                 for page in pdf.pages:
                     tables = page.extract_tables()
                     for table in tables:
