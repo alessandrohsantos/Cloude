@@ -1,17 +1,25 @@
 """
-Nubank email parser.
+Nubank email/PDF parser.
 
-Handles two types of emails:
+Handles:
 1. Individual transaction notifications: "Compra no débito/crédito aprovada"
 2. Monthly invoice summaries: "A fatura do seu cartão Nubank está fechada"
+3. PDF invoice files (no password)
 """
 import hashlib
+import io
 import re
 from datetime import date
 from typing import Optional
 from bs4 import BeautifulSoup
 
 from .base import Transaction, parse_brl_amount, parse_pt_date
+
+try:
+    import pdfplumber
+    HAS_PDFPLUMBER = True
+except ImportError:
+    HAS_PDFPLUMBER = False
 
 
 NUBANK_SENDERS = [
@@ -48,10 +56,17 @@ class NubankParser:
         body_html: str,
         body_text: str,
         received_date: date,
+        pdf_attachments: Optional[list[bytes]] = None,
     ) -> list[Transaction]:
-        transactions = []
+        # Try PDF first (most complete data)
+        if pdf_attachments and HAS_PDFPLUMBER:
+            transactions = []
+            for pdf_bytes in pdf_attachments:
+                transactions.extend(self._parse_pdf(message_id, pdf_bytes, received_date))
+            if transactions:
+                return transactions
 
-        # Try invoice/statement parsing first
+        # Try HTML/text invoice parsing
         transactions = self._parse_invoice(message_id, body_html, body_text, received_date)
         if transactions:
             return transactions
@@ -62,6 +77,37 @@ class NubankParser:
             return [tx]
 
         return []
+
+    def _parse_pdf(
+        self, message_id: str, pdf_bytes: bytes, received_date: date
+    ) -> list[Transaction]:
+        """Parse a Nubank PDF invoice (no password required)."""
+        transactions = []
+        try:
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                for page in pdf.pages:
+                    tables = page.extract_tables()
+                    for table in tables:
+                        for row in table:
+                            if not row:
+                                continue
+                            tx = self._try_parse_row(
+                                message_id, [str(c or "") for c in row], received_date
+                            )
+                            if tx:
+                                transactions.append(tx)
+
+                    if not transactions:
+                        text = page.extract_text() or ""
+                        for line in text.splitlines():
+                            tx = self._try_extract_transaction(
+                                message_id, line.strip(), received_date
+                            )
+                            if tx:
+                                transactions.append(tx)
+        except Exception:
+            pass
+        return transactions
 
     def _parse_invoice(
         self, message_id: str, html: str, text: str, received_date: date

@@ -75,9 +75,8 @@ def _try_parse(
             body_html="",
             body_text="",
             received_date=received_date,
+            pdf_attachments=[content],
         )
-        if bank in ("itau", "santander"):
-            kwargs["pdf_attachments"] = [content]
 
         return parser.parse(**kwargs)
     except Exception:

@@ -15,15 +15,41 @@ class Transaction:
 
 
 def parse_brl_amount(text: str) -> Optional[float]:
-    """Parse Brazilian currency strings like R$ 1.234,56 or 1234,56"""
-    text = text.strip()
-    match = re.search(r"R?\$?\s*([\d.,]+)", text.replace("\xa0", " "))
+    """Parse currency strings in both BR (1.234,56) and US (1,234.56) formats."""
+    text = text.strip().replace("\xa0", " ").replace("​", "")
+    match = re.search(r"R?\$?\s*([\d.,]+)", text)
     if not match:
         return None
-    raw = match.group(1)
-    raw = raw.replace(".", "").replace(",", ".")
+    raw = match.group(1).strip()
+
+    last_dot = raw.rfind(".")
+    last_comma = raw.rfind(",")
+
+    if last_dot > 0 and last_comma > 0:
+        if last_comma > last_dot:
+            # BR format: "1.234,56" — dot=thousands, comma=decimal
+            raw = raw.replace(".", "").replace(",", ".")
+        else:
+            # US format: "1,234.56" — comma=thousands, dot=decimal
+            raw = raw.replace(",", "")
+    elif last_comma > 0:
+        after = raw[last_comma + 1:]
+        if len(after) <= 2:
+            # Looks like decimal: "1234,56"
+            raw = raw.replace(",", ".")
+        else:
+            # Looks like thousands separator: "1,500"
+            raw = raw.replace(",", "")
+    elif last_dot > 0:
+        after = raw[last_dot + 1:]
+        if len(after) == 3:
+            # Dot as thousands separator: "1.500"
+            raw = raw.replace(".", "")
+        # else: dot as decimal — leave as-is
+
     try:
-        return float(raw)
+        value = float(raw)
+        return value if value > 0 else None
     except ValueError:
         return None
 
