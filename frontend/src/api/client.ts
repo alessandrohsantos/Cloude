@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AuthStatus, DashboardData, Transaction, Category } from '../types'
+import type { AuthStatus, DashboardData, Transaction, Category, WaterDashboardData } from '../types'
 
 const api = axios.create({
   baseURL: '/api',
@@ -52,4 +52,18 @@ export async function updateTransactionCategory(
   await api.put(`/transactions/${id}/category`, null, {
     params: { category },
   })
+}
+
+export async function syncWater(): Promise<{
+  success: boolean
+  readings_imported: number
+  message: string
+}> {
+  const res = await api.post('/water/sync')
+  return res.data
+}
+
+export async function getWaterDashboard(months: number): Promise<WaterDashboardData> {
+  const res = await api.get('/water/dashboard', { params: { months } })
+  return res.data
 }

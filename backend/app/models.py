@@ -59,6 +59,22 @@ class SyncStatusDB(Base):
     months_synced = Column(Integer, default=0)
 
 
+class WaterReadingDB(Base):
+    __tablename__ = "water_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reading_date = Column(Date, nullable=False, unique=True, index=True)
+    consumo_m3 = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class WaterSyncStatusDB(Base):
+    __tablename__ = "water_sync_status"
+
+    id = Column(Integer, primary_key=True)
+    last_sync = Column(DateTime)
+
+
 # Pydantic schemas
 
 class Transaction(BaseModel):
@@ -128,3 +144,60 @@ class SyncResponse(BaseModel):
 class AuthStatus(BaseModel):
     authenticated: bool
     email: Optional[str] = None
+
+
+# ─── Água (Vedrano) ─────────────────────────────────────────────────────────
+
+class WaterReading(BaseModel):
+    reading_date: date
+    consumo_m3: float
+
+    class Config:
+        from_attributes = True
+
+
+class WaterTierBreakdown(BaseModel):
+    ate_m3: Optional[float]
+    m3_na_faixa: float
+    tarifa_agua_m3: float
+    tarifa_esgoto_m3: float
+    valor_agua: float
+    valor_esgoto: float
+
+    class Config:
+        from_attributes = True
+
+
+class WaterBill(BaseModel):
+    consumo_m3: float
+    valor_agua: float
+    valor_esgoto: float
+    taxa_fixa: float
+    valor_total: float
+    faixas: list[WaterTierBreakdown]
+    configurado: bool
+    categoria: str
+
+    class Config:
+        from_attributes = True
+
+
+class WaterMonthlyTotal(BaseModel):
+    year: int
+    month: int
+    consumo_m3: float
+
+
+class WaterDashboardResponse(BaseModel):
+    readings: list[WaterReading]
+    monthly_totals: list[WaterMonthlyTotal]
+    consumo_periodo_m3: float
+    media_diaria_m3: float
+    bill: WaterBill
+    last_sync: Optional[datetime]
+
+
+class WaterSyncResponse(BaseModel):
+    success: bool
+    readings_imported: int
+    message: str

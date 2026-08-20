@@ -1,0 +1,15 @@
+{
+  "_comentario": "Tarifas de água/esgoto usadas para calcular o valor a pagar. A Sabesp reajusta os valores periodicamente e cobra por faixa progressiva de consumo (o valor de cada faixa se aplica apenas aos m³ dentro dela, não ao consumo total). Preencha 'tarifa_agua_m3' e 'tarifa_esgoto_m3' de cada faixa com os valores atuais em https://site.sabesp.com.br (Tarifas > Residencial) ou com o valor impresso na sua conta de água. Enquanto 'configurado' estiver false, o app avisa que os valores são placeholder e não devem ser usados para pagamento.",
+  "configurado": false,
+  "categoria": "Residencial Normal",
+  "municipio": "",
+  "atualizado_em": null,
+  "taxa_fixa_rs": 0.0,
+  "faixas": [
+    { "ate_m3": 10, "tarifa_agua_m3": 0.0, "tarifa_esgoto_m3": 0.0 },
+    { "ate_m3": 20, "tarifa_agua_m3": 0.0, "tarifa_esgoto_m3": 0.0 },
+    { "ate_m3": 30, "tarifa_agua_m3": 0.0, "tarifa_esgoto_m3": 0.0 },
+    { "ate_m3": 50, "tarifa_agua_m3": 0.0, "tarifa_esgoto_m3": 0.0 },
+    { "ate_m3": null, "tarifa_agua_m3": 0.0, "tarifa_esgoto_m3": 0.0 }
+  ]
+}

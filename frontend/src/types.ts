@@ -70,3 +70,43 @@ export interface AuthStatus {
   authenticated: boolean
   email?: string
 }
+
+export interface WaterReading {
+  reading_date: string
+  consumo_m3: number
+}
+
+export interface WaterTierBreakdown {
+  ate_m3: number | null
+  m3_na_faixa: number
+  tarifa_agua_m3: number
+  tarifa_esgoto_m3: number
+  valor_agua: number
+  valor_esgoto: number
+}
+
+export interface WaterBill {
+  consumo_m3: number
+  valor_agua: number
+  valor_esgoto: number
+  taxa_fixa: number
+  valor_total: number
+  faixas: WaterTierBreakdown[]
+  configurado: boolean
+  categoria: string
+}
+
+export interface WaterMonthlyTotal {
+  year: number
+  month: number
+  consumo_m3: number
+}
+
+export interface WaterDashboardData {
+  readings: WaterReading[]
+  monthly_totals: WaterMonthlyTotal[]
+  consumo_periodo_m3: number
+  media_diaria_m3: number
+  bill: WaterBill
+  last_sync: string | null
+}

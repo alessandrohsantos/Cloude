@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { DashboardData, AuthStatus } from './types'
-import { getAuthStatus, startGoogleAuth, logout, syncTransactions, getDashboard } from './api/client'
+import type { DashboardData, AuthStatus, WaterDashboardData } from './types'
+import { getAuthStatus, startGoogleAuth, logout, syncTransactions, getDashboard, getWaterDashboard } from './api/client'
 import SummaryCards from './components/SummaryCards'
 import CategoryChart from './components/CategoryChart'
 import TrendChart from './components/TrendChart'
 import MonthlyChart from './components/MonthlyChart'
 import TransactionTable from './components/TransactionTable'
 import FileUploader from './components/FileUploader'
+import WaterDashboard from './components/water/WaterDashboard'
 
-type Tab = 'dashboard' | 'transactions' | 'import'
+type Tab = 'dashboard' | 'transactions' | 'import' | 'water'
 
 export default function App() {
   const [auth, setAuth] = useState<AuthStatus>({ authenticated: false })
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [waterDashboard, setWaterDashboard] = useState<WaterDashboardData | null>(null)
   const [months, setMonths] = useState(3)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -49,9 +51,19 @@ export default function App() {
     }
   }, [])
 
+  const fetchWaterDashboard = useCallback(async (m: number) => {
+    try {
+      const data = await getWaterDashboard(m)
+      setWaterDashboard(data)
+    } catch (e) {
+      console.error('Water dashboard fetch failed', e)
+    }
+  }, [])
+
   useEffect(() => {
     fetchDashboard(months)
-  }, [fetchDashboard, months])
+    fetchWaterDashboard(months)
+  }, [fetchDashboard, fetchWaterDashboard, months])
 
   const handleLogin = async () => {
     const url = await startGoogleAuth()
@@ -158,7 +170,7 @@ export default function App() {
         {/* Period selector + tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
           <div className="flex gap-1 bg-gray-900 rounded-xl p-1 w-fit">
-            {(['import', 'dashboard', 'transactions'] as Tab[]).map((tab) => (
+            {(['import', 'dashboard', 'transactions', 'water'] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -168,7 +180,7 @@ export default function App() {
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                {tab === 'import' ? '↑ Importar' : tab === 'dashboard' ? 'Dashboard' : 'Transações'}
+                {tab === 'import' ? '↑ Importar' : tab === 'dashboard' ? 'Dashboard' : tab === 'transactions' ? 'Transações' : '💧 Água'}
               </button>
             ))}
           </div>
@@ -233,6 +245,11 @@ export default function App() {
           ) : (
             <EmptyDashboard onGoToImport={() => setActiveTab('import')} />
           )
+        )}
+
+        {/* Water tab */}
+        {activeTab === 'water' && (
+          <WaterDashboard data={waterDashboard} onSynced={() => fetchWaterDashboard(months)} />
         )}
       </main>
     </div>

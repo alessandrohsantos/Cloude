@@ -38,3 +38,6 @@ Thumbs.db
 credentials.json
 token.json
 client_secret*.json
+
+# Vedrano scraper debug artifacts (screenshots/HTML/JSON captured from the portal)
+backend/debug_vedrano/

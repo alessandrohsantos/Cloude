@@ -1,6 +1,6 @@
 # Controle de Faturas de Cartão de Crédito
 
-Aplicação fullstack para consolidar faturas do **Nubank**, **Itaú** e **Santander** diretamente do Gmail, com categorização automática de gastos e previsão de tendências futuras.
+Aplicação fullstack para consolidar faturas do **Nubank**, **Itaú** e **Santander** diretamente do Gmail, com categorização automática de gastos e previsão de tendências futuras. Também inclui um módulo de **consumo de água** que importa as leituras diárias do portal Vedrano do condomínio e calcula o valor estimado da conta.
 
 ## Funcionalidades
 
@@ -10,6 +10,7 @@ Aplicação fullstack para consolidar faturas do **Nubank**, **Itaú** e **Santa
 - **Previsão de gastos** — regressão linear projeta os próximos 3 meses por categoria
 - **Filtros e busca** — filtre por banco, categoria e descrição
 - **Edição de categorias** — corrija classificações diretamente na tabela
+- **Consumo de água (Vedrano)** — importa as leituras diárias do portal do condomínio e calcula o valor da conta por faixa tarifária progressiva
 
 ## Pré-requisitos
 
@@ -99,7 +100,60 @@ GOOGLE_REDIRECT_URI=http://localhost:8000/auth/callback
 SECRET_KEY=gere-uma-chave-secreta-aqui
 DATABASE_URL=sqlite:///./creditcards.db
 FRONTEND_URL=http://localhost:5173
+
+# Água (Vedrano)
+VEDRANO_LOGIN=xxxx
+VEDRANO_SENHA=xxxx
+VEDRANO_LOGIN_URL=https://consultaleituras.vedrano.com.br/login-externo
+VEDRANO_DEBUG=0
 ```
+
+---
+
+## Módulo de Água (Vedrano)
+
+Importa as leituras diárias de consumo de água do portal do condomínio
+(consultaleituras.vedrano.com.br) via automação de navegador e calcula o valor
+estimado da conta por faixa tarifária progressiva.
+
+### Configuração
+
+1. **Credenciais do portal**: preencha `VEDRANO_LOGIN` e `VEDRANO_SENHA` no
+   `.env` do backend — são os dados recebidos por e-mail da administradora
+   ("Login Água" / "Senha Água").
+2. **Navegador do Playwright** (só na primeira vez):
+   ```bash
+   cd backend
+   playwright install chromium
+   ```
+3. **Tarifa**: edite `backend/app/water/sabesp_tarifas.json` com os valores de
+   R$/m³ atuais (água e esgoto) por faixa de consumo — pegue no site da Sabesp
+   ou na sua própria conta de água — e mude `"configurado"` para `true`.
+   Enquanto isso não for feito, o dashboard mostra o consumo normalmente mas
+   o valor calculado fica zerado, com um aviso.
+
+### Uso
+
+Na aba **💧 Água** do app, clique em "Sincronizar com o Vedrano" para importar
+as leituras mais recentes. O dashboard mostra o consumo diário, o consumo do
+mês, o detalhamento por faixa tarifária e o valor total estimado da conta
+(água + esgoto + taxa fixa, se configurada).
+
+### Se a sincronização falhar
+
+O portal Vedrano não tem API pública, então a importação usa automação de
+navegador com seletores heurísticos que não puderam ser validados contra o
+site real durante o desenvolvimento. Se o login ou a extração das leituras
+falhar:
+
+```bash
+# no .env do backend
+VEDRANO_DEBUG=1
+```
+
+Isso salva screenshot, HTML e as respostas JSON capturadas da página em
+`backend/debug_vedrano/` (pasta ignorada pelo git) para diagnosticar e
+ajustar os seletores em `backend/app/water/vedrano_client.py`.
 
 ---
 
@@ -115,11 +169,16 @@ backend/
 │   ├── models.py        # Modelos Pydantic + SQLAlchemy
 │   ├── categorizer.py   # Classificação por palavras-chave
 │   ├── analytics.py     # Agregações + regressão linear
-│   └── parsers/
-│       ├── base.py      # Utilitários (parse valor BR, data PT)
-│       ├── nubank.py    # Parser emails Nubank
-│       ├── itau.py      # Parser emails + PDF Itaú
-│       └── santander.py # Parser emails + PDF Santander
+│   ├── parsers/
+│   │   ├── base.py      # Utilitários (parse valor BR, data PT)
+│   │   ├── nubank.py    # Parser emails Nubank
+│   │   ├── itau.py      # Parser emails + PDF Itaú
+│   │   └── santander.py # Parser emails + PDF Santander
+│   └── water/
+│       ├── vedrano_client.py  # Login + scraping do portal Vedrano (Playwright)
+│       ├── tariff.py          # Cálculo da conta por faixa tarifária progressiva
+│       ├── analytics.py       # Agregação das leituras (diário/mensal)
+│       └── sabesp_tarifas.json # Tabela de tarifas editável (água/esgoto por faixa)
 
 frontend/
 └── src/
@@ -131,7 +190,12 @@ frontend/
         ├── CategoryChart.tsx # Pizza + barras por categoria
         ├── TrendChart.tsx    # Linha temporal + forecast
         ├── MonthlyChart.tsx  # Barras empilhadas por banco
-        └── TransactionTable.tsx # Tabela com filtros e edição
+        ├── TransactionTable.tsx # Tabela com filtros e edição
+        └── water/
+            ├── WaterDashboard.tsx        # Container + botão de sincronização
+            ├── WaterSummaryCards.tsx     # Cards de resumo (consumo, valor, etc.)
+            ├── WaterConsumptionChart.tsx # Gráfico de consumo diário
+            └── WaterBillBreakdown.tsx    # Detalhamento por faixa tarifária
 ```
 
 ## Como funciona a previsão de tendências

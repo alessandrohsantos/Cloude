@@ -39,7 +39,13 @@ from .models import (
     SyncStatusDB,
     Transaction,
     TransactionDB,
+    WaterDashboardResponse,
+    WaterReadingDB,
+    WaterSyncResponse,
+    WaterSyncStatusDB,
 )
+from .water.analytics import compute_water_dashboard
+from .water.vedrano_client import VedranoClient, VedranoLoginError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -396,6 +402,74 @@ def update_category(
     tx.category = category
     db.commit()
     return {"success": True}
+
+
+# ─── Água (Vedrano) ─────────────────────────────────────────────────────────
+
+@app.post("/water/sync", response_model=WaterSyncResponse)
+def sync_water(db: Session = Depends(get_db)):
+    """Loga no portal Vedrano e importa as leituras diárias de consumo de água."""
+    login = os.getenv("VEDRANO_LOGIN")
+    senha = os.getenv("VEDRANO_SENHA")
+    if not login or not senha:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure VEDRANO_LOGIN e VEDRANO_SENHA no arquivo .env do backend.",
+        )
+    login_url = os.getenv("VEDRANO_LOGIN_URL", "https://consultaleituras.vedrano.com.br/login-externo")
+    debug = os.getenv("VEDRANO_DEBUG", "0") == "1"
+
+    try:
+        client = VedranoClient(login=login, senha=senha, login_url=login_url, debug=debug)
+        raw_readings = client.fetch_readings()
+    except VedranoLoginError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.error(f"Vedrano sync error: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Erro consultando o portal Vedrano: {e}")
+
+    if not raw_readings:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Login no Vedrano funcionou, mas nenhuma leitura de consumo foi encontrada. "
+                "Rode com VEDRANO_DEBUG=1 e confira backend/debug_vedrano/ para ajustar o scraper."
+            ),
+        )
+
+    imported = 0
+    for r in raw_readings:
+        existing = db.query(WaterReadingDB).filter(
+            WaterReadingDB.reading_date == r.reading_date
+        ).first()
+        if existing:
+            if existing.consumo_m3 != r.consumo_m3:
+                existing.consumo_m3 = r.consumo_m3
+            continue
+        db.add(WaterReadingDB(reading_date=r.reading_date, consumo_m3=r.consumo_m3))
+        imported += 1
+
+    sync = db.query(WaterSyncStatusDB).first()
+    if not sync:
+        sync = WaterSyncStatusDB()
+        db.add(sync)
+    sync.last_sync = datetime.utcnow()
+    db.commit()
+
+    return WaterSyncResponse(
+        success=True,
+        readings_imported=imported,
+        message=f"{imported} novas leituras importadas ({len(raw_readings)} encontradas no portal).",
+    )
+
+
+@app.get("/water/dashboard", response_model=WaterDashboardResponse)
+def get_water_dashboard(
+    months: int = Query(default=3, ge=1, le=24),
+    db: Session = Depends(get_db),
+):
+    data = compute_water_dashboard(db, months)
+    return WaterDashboardResponse(**data)
 
 
 @app.get("/health")

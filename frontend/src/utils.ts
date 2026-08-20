@@ -17,6 +17,14 @@ export function formatDate(isoString: string): string {
   }
 }
 
+export function formatDateOnly(isoDate: string): string {
+  try {
+    return format(parseISO(isoDate), 'dd/MM/yyyy', { locale: ptBR })
+  } catch {
+    return isoDate
+  }
+}
+
 export function monthLabel(year: number, month: number): string {
   const months = [
     'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
